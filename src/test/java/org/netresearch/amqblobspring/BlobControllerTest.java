@@ -49,7 +49,6 @@ import static org.junit.Assert.assertTrue;
 @ContextConfiguration(initializers = BlobControllerTest.Initializer.class)
 @EnableAutoConfiguration
 @EnableWebMvc
-@ComponentScan
 public class BlobControllerTest {
   @Value("nio://localhost:${jmsPort}")
   private String amqUrl;
