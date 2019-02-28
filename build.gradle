@@ -7,7 +7,7 @@ apply plugin: 'java'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
 
-group 'org.blugento.common'
+group 'org.netresearch'
 version '1.0-SNAPSHOT'
 
 sourceCompatibility = 1.8
@@ -19,5 +19,9 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.apache.activemq:activemq-client:5.15.8'
+    implementation 'org.apache.activemq:activemq-client:5.15+'
+
+    testCompile 'org.springframework.boot:spring-boot-starter-test'
+    testCompile 'org.apache.activemq:activemq-broker'
+    testCompile 'junit:junit'
 }

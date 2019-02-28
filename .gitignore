@@ -2,4 +2,4 @@
 !/src
 !/.gitignore
 !/gradlew*
-!/gradle/wrapper/gradle-wrapper.properties
+!/gradle

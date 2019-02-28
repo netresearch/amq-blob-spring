@@ -1,4 +1,4 @@
-package org.blugento.common.amq.blob.spring;
+package org.netresearch.amqblobspring;
 
 import org.apache.activemq.ActiveMQSession;
 import org.apache.activemq.blob.BlobTransferPolicy;
@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import javax.jms.JMSException;
 import java.io.File;
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -19,11 +18,12 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
+@SuppressWarnings("WeakerAccess")
 public class BlobRegistry {
-  @Value("${datahub.blob.ttl:300}")
+  @Value("${amq.blob.ttl:300}")
   private long ttl;
 
-  @Value("${datahub.blob.url:http://localhost:8080}")
+  @Value("${amq.blob.url:http://localhost:${server.port}}")
   private URI url;
 
   private final Collection<BlobEntry> files = new CopyOnWriteArrayList<>();
@@ -44,7 +44,7 @@ public class BlobRegistry {
       files.add(blobEntry);
     }
     String id = UUID.randomUUID().toString();
-    URL fileUrl = null;
+    URL fileUrl;
     try {
       fileUrl = url.resolve("/blob/" + id).toURL();
     } catch (MalformedURLException e) {
@@ -65,8 +65,8 @@ public class BlobRegistry {
     }
 
     @Override
-    public URL upload(ActiveMQBlobMessage message) throws JMSException, IOException {
-      if (message != this.message) {
+    public URL upload(ActiveMQBlobMessage message) throws JMSException {
+      if (!message.equals(this.message)) {
         throw new JMSException("Wrong message");
       }
       return message.getURL();

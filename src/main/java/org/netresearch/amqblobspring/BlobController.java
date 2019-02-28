@@ -1,4 +1,4 @@
-package org.blugento.common.amq.blob.spring;
+package org.netresearch.amqblobspring;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -19,7 +19,7 @@ public class BlobController {
   @Autowired
   private BlobRegistry registry;
 
-  @GetMapping("/blob/${id}")
+  @GetMapping("/blob/{id}")
   public ResponseEntity<?> getFile(@PathVariable String id) {
     BlobEntry blobEntry = registry.getFileEntry(id);
     InputStream inputStream = null;

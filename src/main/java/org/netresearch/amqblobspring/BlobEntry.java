@@ -1,6 +1,5 @@
-package org.blugento.common.amq.blob.spring;
+package org.netresearch.amqblobspring;
 
-import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,12 +12,12 @@ import java.util.TimerTask;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 class BlobEntry {
   private static final Logger log = LoggerFactory.getLogger(BlobEntry.class);
 
-  @Getter
   private final Path path;
 
   private final Collection<String> ids = new CopyOnWriteArraySet<>();
@@ -29,7 +28,7 @@ class BlobEntry {
   private final AtomicInteger runningDownloads = new AtomicInteger(0);
   private final AtomicBoolean deleted = new AtomicBoolean(false);
 
-  private final Timer timer = new Timer();
+  private final AtomicReference<Timer> timer = new AtomicReference<>();
 
   BlobEntry(Path path, long ttl, Consumer<BlobEntry> onDeletion) {
     this.path = path;
@@ -38,10 +37,10 @@ class BlobEntry {
   }
 
   private void scheduleDeletion() {
-    timer.cancel();
-
+    unscheduleDeletion();
     final int expected = expectedDownloads.get();
-    timer.schedule(new TimerTask() {
+    timer.set(new Timer());
+    timer.get().schedule(new TimerTask() {
       @Override
       public void run() {
         if (expected == expectedDownloads.get() && runningDownloads.get() == 0 && !deleted.get()) {
@@ -49,6 +48,12 @@ class BlobEntry {
         }
       }
     }, ttl * 1000, ttl * 1000);
+  }
+
+  private void unscheduleDeletion() {
+    if (timer.get() != null) {
+      timer.getAndSet(null).cancel();
+    }
   }
 
   void expectDownloads(String id, int expectedDownloads) {
@@ -59,6 +64,10 @@ class BlobEntry {
 
   boolean hasId(String id) {
     return ids.contains(id);
+  }
+
+  Path getPath() {
+    return path;
   }
 
   void markRunning() {
@@ -90,7 +99,7 @@ class BlobEntry {
         Files.delete(path);
       }
       onDeletion.accept(this);
-      timer.cancel();
+      unscheduleDeletion();
       log.error("Deleted {}", path);
     } catch (IOException e) {
       log.error("Error while deleting {}", path, e);
