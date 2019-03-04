@@ -15,7 +15,6 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -23,6 +22,7 @@ import org.springframework.util.SocketUtils;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
+import javax.jms.BytesMessage;
 import javax.jms.Connection;
 import javax.jms.Message;
 import javax.jms.MessageProducer;
@@ -30,6 +30,7 @@ import javax.jms.Queue;
 import javax.jms.QueueReceiver;
 import javax.jms.Session;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,7 +45,8 @@ import static org.junit.Assert.assertTrue;
 @RunWith(SpringRunner.class)
 @SpringBootConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
-    "amq.blob.ttl=2" // 2 seconds
+    "amq.blob.ttl=2", // 2 seconds
+    "amq.blob.min=10" // 10 bytes
 })
 @ContextConfiguration(initializers = BlobControllerTest.Initializer.class)
 @EnableAutoConfiguration
@@ -77,13 +79,13 @@ public class BlobControllerTest {
   }
 
   @Test
-  public void testActiveMqSingle() throws Exception {
+  public void testSingleBlobMessageFromFile() throws Exception {
     Queue destination = session.createQueue("test");
 
     String content = "Test content";
     Path file = testPath.resolve(UUID.randomUUID().toString());
     Files.write(file, content.getBytes());
-    session.createProducer(destination).send(registry.createBlobMessage(session, file, 1));
+    session.createProducer(destination).send(registry.createMessage(session, file, 1));
 
     QueueReceiver receiver = session.createReceiver(destination);
     Message message = receiver.receive(500);
@@ -96,7 +98,7 @@ public class BlobControllerTest {
   }
 
   @Test
-  public void testActiveMqMultiple() throws Exception {
+  public void testMultipleBlobMessagesFromFile() throws Exception {
     Queue destination = session.createQueue("test");
     String content = "Test content";
     Path file = testPath.resolve(UUID.randomUUID().toString());
@@ -105,7 +107,7 @@ public class BlobControllerTest {
     QueueReceiver receiver = session.createReceiver(destination);
 
     for (int i = 1; i <=3; i++) {
-      producer.send(registry.createBlobMessage(session, file, 1));
+      producer.send(registry.createMessage(session, file, 1));
     }
 
     for (int i = 1; i <=3; i++) {
@@ -121,13 +123,13 @@ public class BlobControllerTest {
 
 
   @Test
-  public void testTtl() throws Exception {
+  public void testNotFetchedFilesDeletedAfterTtl() throws Exception {
     Queue destination = session.createQueue("test");
 
     Path file = testPath.resolve(UUID.randomUUID().toString());
     Files.write(file, "Test content".getBytes());
-    session.createProducer(destination).send(registry.createBlobMessage(session, file, 1));
-    session.createProducer(destination).send(registry.createBlobMessage(session, file, 1));
+    session.createProducer(destination).send(registry.createMessage(session, file, 1));
+    session.createProducer(destination).send(registry.createMessage(session, file));
 
     QueueReceiver receiver = session.createReceiver(destination);
     receiver.receive(500);
@@ -143,6 +145,67 @@ public class BlobControllerTest {
     } catch (IOException e) {
       assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 403"));
     }
+  }
+
+  @Test
+  public void testBytesMessageCreatedForContentLengthBelowMin() throws Exception {
+    Queue destination = session.createQueue("test");
+
+    String content = "To short";
+    Path file = testPath.resolve(UUID.randomUUID().toString());
+    Files.write(file, content.getBytes());
+    session.createProducer(destination).send(registry.createMessage(session, file, 1));
+
+    QueueReceiver receiver = session.createReceiver(destination);
+    Message message = receiver.receive(500);
+    assertTrue(message instanceof BytesMessage);
+    assertFalse(Files.exists(file));
+
+    BytesMessage byteMessage = (BytesMessage) message;
+    byte[] byteData = new byte[(int) byteMessage.getBodyLength()];
+    byteMessage.readBytes(byteData);
+    byteMessage.reset();
+
+    assertEquals(content, new String(byteData, Charset.defaultCharset()));
+  }
+
+  @Test
+  public void testSingleBlobMessageFromBytes() throws Exception {
+
+    Queue destination = session.createQueue("test");
+
+    String content = "Test content";
+    session.createProducer(destination).send(registry.createMessage(session, content.getBytes()));
+
+    QueueReceiver receiver = session.createReceiver(destination);
+    Message message = receiver.receive(500);
+    assertTrue(message instanceof ActiveMQBlobMessage);
+    String url = ((ActiveMQBlobMessage) message).getRemoteBlobUrl();
+    Path file = testPath.resolve(url.substring(url.lastIndexOf("/") + 1));
+    assertTrue(Files.exists(file));
+    assertEquals(content, StreamUtils.copyToString(((ActiveMQBlobMessage) message).getInputStream(), StandardCharsets.UTF_8));
+
+    // The final deletion happens asynchronously and might be a bit delayed
+    runWithDelay(10, () -> assertFalse(Files.exists(file)));
+  }
+
+  @Test
+  public void testBytesMessageCreatedForContentLengthBelowMinFromBytes() throws Exception {
+    Queue destination = session.createQueue("test");
+
+    String content = "To short";
+    session.createProducer(destination).send(registry.createMessage(session, content.getBytes(), 1));
+
+    QueueReceiver receiver = session.createReceiver(destination);
+    Message message = receiver.receive(500);
+    assertTrue(message instanceof BytesMessage);
+
+    BytesMessage byteMessage = (BytesMessage) message;
+    byte[] byteData = new byte[(int) byteMessage.getBodyLength()];
+    byteMessage.readBytes(byteData);
+    byteMessage.reset();
+
+    assertEquals(content, new String(byteData, Charset.defaultCharset()));
   }
 
   private void runWithDelay(long delay, Runnable task) throws InterruptedException {
