@@ -28,7 +28,7 @@ public class BlobRegistry {
   @Value("${amq.blob.ttl:300}")
   private long ttl;
 
-  @Value("${amq.blob.url:http://localhost:${server.port}}")
+  @Value("${amq.blob.url:http://localhost:${server.port:8080}}")
   private URI url;
 
   @Value("${amq.blob.min:#{1*1024*1024}}")
