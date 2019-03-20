@@ -29,6 +29,7 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.QueueReceiver;
 import javax.jms.Session;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +41,7 @@ import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(SpringRunner.class)
@@ -206,6 +208,23 @@ public class BlobControllerTest {
     byteMessage.reset();
 
     assertEquals(content, new String(byteData, Charset.defaultCharset()));
+  }
+
+  @Test
+  public void testBlobMessageFromInputStream() throws Exception {
+    Queue destination = session.createQueue("test");
+
+    String content = "To short"; // But anyway it'll be a BlobMessage
+    session.createProducer(destination).send(registry.createMessage(session, new ByteArrayInputStream(content.getBytes())));
+
+    QueueReceiver receiver = session.createReceiver(destination);
+    Message message = receiver.receive(500);
+    assertTrue(message instanceof ActiveMQBlobMessage);
+    assertEquals(content, StreamUtils.copyToString(((ActiveMQBlobMessage) message).getInputStream(), StandardCharsets.UTF_8));
+
+    // Assert that StreamEntry is removed after retrieval
+    String url = ((ActiveMQBlobMessage) message).getRemoteBlobUrl();
+    assertNull(registry.getEntry(url.substring(url.lastIndexOf("/") + 1)));
   }
 
   private void runWithDelay(long delay, Runnable task) throws InterruptedException {

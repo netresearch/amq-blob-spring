@@ -56,6 +56,13 @@ public class Sender {
     // (after the next invocation, 43 downloads are expected)
     producer.send(blobRegistry.createMessage(session, file));
   }
+  
+  public void sendInputStream() throws JMSException {
+    // You can also send an input stream - but currently only for one retrieval
+    // The stream will be closed after it's sent
+    InputStream inputStream = new ByteArrayInputStream(contents);
+    producer.send(blobRegistry.createMessage(session, inputStream));
+  }
 }
 ```
 
@@ -67,4 +74,11 @@ Property | Default | Description
 --- | --- | ---
 amq.blob.min | 1048576 (1MB) | Treshold of content length from which BlobMessages should be created
 amq.blob.ttl | 300 (5 minutes) | Number of seconds to wait for downloads to start until the file will be deleted.
-amq.blob.dir | java.io.tmpdir | Directory in which to create temporary files when sending creating messages from bytes 
+amq.blob.dir | java.io.tmpdir | Directory in which to create temporary files when sending creating messages from bytes
+
+## Caveats
+
+- Currently the underlying `FileInputStream` or other `InputStream` objects will be closed and unregistered also when an
+  exception occurs during retrieval. Related files will also be deleted in that case (files messages where created from
+  and temporary files automatically created for messages from `Byte[]`)
+- Messages created from `InputStream` can only be sent once and without a Content-Length header  

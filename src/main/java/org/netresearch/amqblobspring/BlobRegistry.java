@@ -13,6 +13,7 @@ import javax.jms.Message;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -37,14 +38,10 @@ public class BlobRegistry {
   @Value("${amq.blob.dir:${java.io.tmpdir}}")
   private Path dir;
 
-  private final Collection<BlobEntry> files = new CopyOnWriteArrayList<>();
+  private final Collection<BlobEntry> entries = new CopyOnWriteArrayList<>();
 
-  BlobEntry getFileEntry(String id) {
-    return files.stream().filter(blobEntry -> blobEntry.hasId(id)).findFirst().orElse(null);
-  }
-
-  private BlobEntry getFileEntry(Path path) {
-    return files.stream().filter(fe -> fe.getPath().equals(path)).findFirst().orElse(null);
+  BlobEntry getEntry(String id) {
+    return entries.stream().filter(blobEntry -> blobEntry.hasId(id)).findFirst().orElse(null);
   }
 
   public Message createMessage(ActiveMQSession session, Path path, int expectedDownloads)
@@ -56,7 +53,7 @@ public class BlobRegistry {
       return message;
     }
 
-    return createBlobMessage(session, UUID.randomUUID().toString(), path, expectedDownloads);
+    return createMessage(session, UUID.randomUUID().toString(), path, expectedDownloads);
   }
 
   public Message createMessage(ActiveMQSession session, Path path) throws JMSException, IOException {
@@ -77,16 +74,32 @@ public class BlobRegistry {
     Path path = dir.resolve(id);
     Files.copy(new ByteArrayInputStream(contents), path);
     System.out.println("Send: " + path);
-    return createBlobMessage(session, id, path, expectedDownloads);
+    return createMessage(session, id, path, expectedDownloads);
   }
 
-  private Message createBlobMessage(ActiveMQSession session, String id, Path path, int expectedDownloads)
+  public Message createMessage(ActiveMQSession session, InputStream inputStream) throws JMSException {
+    String id = UUID.randomUUID().toString();
+    entries.add(new StreamEntry(id, ttl, inputStream, entries::remove));
+    return createMessage(session, id);
+  }
+
+  private Message createMessage(ActiveMQSession session, String id, Path path, int expectedDownloads)
       throws JMSException {
-    BlobEntry blobEntry = getFileEntry(path);
-    if (blobEntry == null) {
-      blobEntry = new BlobEntry(path, ttl, files::remove);
-      files.add(blobEntry);
+    FileEntry fileEntry = (FileEntry) entries.stream().filter(
+        fe -> fe instanceof FileEntry && ((FileEntry) fe).getPath().equals(path)
+    ).findFirst().orElse(null);
+
+    if (fileEntry == null) {
+      fileEntry = new FileEntry(path, ttl, entries::remove);
+      entries.add(fileEntry);
     }
+
+    Message message = createMessage(session, id);
+    fileEntry.expectDownloads(id, expectedDownloads);
+    return message;
+  }
+
+  private Message createMessage(ActiveMQSession session, String id) throws JMSException {
     URL fileUrl;
     try {
       fileUrl = url.resolve("/blob/" + id).toURL();
@@ -95,7 +108,6 @@ public class BlobRegistry {
     }
     ActiveMQBlobMessage message = (ActiveMQBlobMessage) session.createBlobMessage(fileUrl);
     message.setBlobUploader(new NoopUploader(message));
-    blobEntry.expectDownloads(id, expectedDownloads);
     return message;
   }
 

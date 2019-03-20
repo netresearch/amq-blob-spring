@@ -1,18 +1,17 @@
 package org.netresearch.amqblobspring;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 @RestController
 public class BlobController {
@@ -20,43 +19,22 @@ public class BlobController {
   private BlobRegistry registry;
 
   @GetMapping("/blob/{id}")
-  public ResponseEntity<?> getFile(@PathVariable String id) {
-    BlobEntry blobEntry = registry.getFileEntry(id);
-    InputStream inputStream = null;
-    if (blobEntry != null) {
-      try {
-        inputStream = new DeleteOnCloseFileInputStream(blobEntry);
-      } catch (FileNotFoundException e) {
-        blobEntry.remove();
-      }
+  public void getFile(HttpServletResponse response, @PathVariable String id) throws IOException {
+    final BlobEntry entry = registry.getEntry(id);
+
+    if (entry == null) {
+      response.sendError(HttpStatus.FORBIDDEN.value(), "Forbidden");
+      return;
     }
 
-    if (inputStream == null) {
-      return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Forbidden");
+    long contentLength = entry.getContentLength();
+    if (contentLength > -1) {
+      response.setContentLengthLong(contentLength);
     }
+    response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
 
-    return ResponseEntity.ok()
-        .contentType(MediaType.APPLICATION_OCTET_STREAM)
-        .contentLength(blobEntry.getPath().toFile().length())
-        .body(new InputStreamResource(inputStream));
-  }
-
-  private static class DeleteOnCloseFileInputStream extends FileInputStream {
-    private final BlobEntry blobEntry;
-
-    DeleteOnCloseFileInputStream(BlobEntry blobEntry) throws FileNotFoundException {
-      super(blobEntry.getPath().toFile());
-      this.blobEntry = blobEntry;
-      blobEntry.markRunning();
-    }
-
-    @Override
-    public void close() throws IOException {
-      try {
-        super.close();
-      } finally {
-        blobEntry.markDone();
-      }
+    try (InputStream in = entry.getInputStream(); OutputStream out = response.getOutputStream()) {
+      StreamUtils.copy(in, out);
     }
   }
 }
