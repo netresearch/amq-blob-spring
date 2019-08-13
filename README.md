@@ -75,6 +75,7 @@ Property | Default | Description
 amq.blob.min | 1048576 (1MB) | Treshold of content length from which BlobMessages should be created
 amq.blob.ttl | 300 (5 minutes) | Number of seconds to wait for downloads to start until the file will be deleted.
 amq.blob.dir | java.io.tmpdir | Directory in which to create temporary files when sending creating messages from bytes
+amq.blob.url | http://localhost:${server.port} | The URL that should be used as base URL for the blobs
 
 ## Caveats
 
