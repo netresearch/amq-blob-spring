@@ -6,11 +6,13 @@ import org.apache.activemq.blob.BlobUploader;
 import org.apache.activemq.command.ActiveMQBlobMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StreamUtils;
 
 import javax.jms.BytesMessage;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,8 +26,10 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
-@SuppressWarnings("WeakerAccess")
 public class BlobRegistry {
+  @Value("${amq.blob.enabled:false}")
+  private boolean blobsEnabled;
+
   @Value("${amq.blob.ttl:300}")
   private long ttl;
 
@@ -46,7 +50,7 @@ public class BlobRegistry {
 
   public Message createMessage(ActiveMQSession session, Path path, int expectedDownloads)
       throws JMSException, IOException {
-    if (path.toFile().length() <= blobMinLength) {
+    if (!blobsEnabled || path.toFile().length() <= blobMinLength) {
       BytesMessage message = session.createBytesMessage();
       message.writeBytes(Files.readAllBytes(path));
       Files.delete(path);
@@ -65,7 +69,7 @@ public class BlobRegistry {
   }
 
   public Message createMessage(ActiveMQSession session, byte[] contents, int expectedDownloads) throws JMSException, IOException {
-    if (contents.length <= blobMinLength) {
+    if (!blobsEnabled || contents.length <= blobMinLength) {
       BytesMessage message = session.createBytesMessage();
       message.writeBytes(contents);
       return message;
@@ -78,6 +82,16 @@ public class BlobRegistry {
   }
 
   public Message createMessage(ActiveMQSession session, InputStream inputStream) throws JMSException {
+    if (!blobsEnabled) {
+      try {
+        try (InputStream in = inputStream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+          StreamUtils.copy(in, out);
+          return createMessage(session, out.toByteArray());
+        }
+      } catch (IOException e) {
+        throw new JMSException("Error while reading the input stream: " + e);
+      }
+    }
     String id = UUID.randomUUID().toString();
     entries.add(new StreamEntry(id, ttl, inputStream, entries::remove));
     return createMessage(session, id);

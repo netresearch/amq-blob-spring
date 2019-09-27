@@ -9,8 +9,8 @@ See the [instructions on JitPack](https://jitpack.io/#netresearch/amq-blob-sprin
 
 ## Usage
 
-Use the `BlobRegistry` provided as `@Service` to create blob messages (or byte messages when the content length 
-is below the `amq.blob.min` threshold).
+Use the `BlobRegistry` provided as `@Service` to create blob messages or byte messages when the content length 
+is below the `amq.blob.min` threshold or `amq.blob.enabled` is `false` (**which is the default**).
 
 ```java
 @Component
@@ -72,6 +72,7 @@ The following properties are available:
 
 Property | Default | Description
 --- | --- | ---
+**amq.blob.enabled** | false | If the creation of BlobMessages is enabled at all
 amq.blob.min | 1048576 (1MB) | Treshold of content length from which BlobMessages should be created
 amq.blob.ttl | 300 (5 minutes) | Number of seconds to wait for downloads to start until the file will be deleted.
 amq.blob.dir | java.io.tmpdir | Directory in which to create temporary files when sending creating messages from bytes

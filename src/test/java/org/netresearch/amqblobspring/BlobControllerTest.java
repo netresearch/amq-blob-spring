@@ -2,7 +2,6 @@ package org.netresearch.amqblobspring;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.activemq.ActiveMQSession;
-import org.apache.activemq.broker.BrokerService;
 import org.apache.activemq.command.ActiveMQBlobMessage;
 import org.junit.After;
 import org.junit.Before;
@@ -10,15 +9,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.SpringBootConfiguration;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.ApplicationContextInitializer;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.core.env.MapPropertySource;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.util.SocketUtils;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
@@ -35,8 +28,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
@@ -45,14 +36,13 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(SpringRunner.class)
-@SpringBootConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
-    "amq.blob.ttl=2", // 2 seconds
-    "amq.blob.min=10" // 10 bytes
+  "amq.blob.enabled=true",
+  "amq.blob.ttl=2", // 2 seconds
+  "amq.blob.min=10" // 10 bytes
 })
-@ContextConfiguration(initializers = BlobControllerTest.Initializer.class)
-@EnableAutoConfiguration
 @EnableWebMvc
+@ContextConfiguration(initializers = BlobTestConfiguration.Initializer.class)
 public class BlobControllerTest {
   @Value("nio://localhost:${jmsPort}")
   private String amqUrl;
@@ -230,28 +220,5 @@ public class BlobControllerTest {
   private void runWithDelay(long delay, Runnable task) throws InterruptedException {
     Thread.sleep(delay);
     task.run();
-  }
-
-  public static class Initializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
-    @Override
-    public void initialize(ConfigurableApplicationContext applicationContext) {
-      Map<String, Object> props = new HashMap<>();
-      props.put("server.port", SocketUtils.findAvailableTcpPort());
-      props.put("jmsPort", SocketUtils.findAvailableTcpPort());
-      props.put("uuid", UUID.randomUUID().toString());
-      MapPropertySource propertySource = new MapPropertySource("agent", props);
-      applicationContext.getEnvironment().getPropertySources().addFirst(propertySource);
-
-      BrokerService broker = new BrokerService();
-      try {
-        broker.setUseShutdownHook(false);
-        broker.setPersistent(false);
-        broker.setUseJmx(false);
-        broker.addConnector("nio://localhost:" + props.get("jmsPort"));
-        broker.start();
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
   }
 }
