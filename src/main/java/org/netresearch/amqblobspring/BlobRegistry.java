@@ -50,7 +50,7 @@ public class BlobRegistry {
 
   public Message createMessage(ActiveMQSession session, Path path, int expectedDownloads)
       throws JMSException, IOException {
-    if (!blobsEnabled || path.toFile().length() <= blobMinLength) {
+    if (!blobsEnabled || path.toFile().length() < blobMinLength) {
       BytesMessage message = session.createBytesMessage();
       message.writeBytes(Files.readAllBytes(path));
       Files.delete(path);
@@ -69,7 +69,7 @@ public class BlobRegistry {
   }
 
   public Message createMessage(ActiveMQSession session, byte[] contents, int expectedDownloads) throws JMSException, IOException {
-    if (!blobsEnabled || contents.length <= blobMinLength) {
+    if (!blobsEnabled || contents.length < blobMinLength) {
       BytesMessage message = session.createBytesMessage();
       message.writeBytes(contents);
       return message;
