@@ -18,10 +18,10 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.apache.activemq:activemq-client:5.17.7'
+    implementation 'org.apache.activemq:activemq-client:5.16.8'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.apache.activemq:activemq-broker:5.17.7'
+    testImplementation 'org.apache.activemq:activemq-broker:5.16.8'
     testImplementation 'junit:junit'
 }
 
