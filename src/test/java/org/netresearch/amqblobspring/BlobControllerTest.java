@@ -47,6 +47,9 @@ public class BlobControllerTest {
   @Value("nio://localhost:${jmsPort}")
   private String amqUrl;
 
+  @Value("${server.port}")
+  private int serverPort;
+
   @Value("${java.io.tmpdir}")
   private Path testPath;
 
@@ -58,7 +61,9 @@ public class BlobControllerTest {
 
   @Before
   public void setUp() throws Exception {
-    connection = new ActiveMQConnectionFactory(amqUrl).createConnection();
+    ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory(amqUrl);
+    factory.getBlobTransferPolicy().setUploadUrl("http://localhost:" + serverPort);
+    connection = factory.createConnection();
     connection.start();
     session = (ActiveMQSession) connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
   }
