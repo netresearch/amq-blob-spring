@@ -1,5 +1,5 @@
 plugins {
-    id 'org.springframework.boot' version '2.7.18'
+    id 'org.springframework.boot' version '3.5.7'
     id 'java'
     id 'maven-publish'
 }
@@ -7,8 +7,8 @@ plugins {
 apply plugin: 'io.spring.dependency-management'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 repositories {
@@ -18,10 +18,10 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.apache.activemq:activemq-client:5.19.1'
+    implementation 'org.apache.activemq:activemq-client:6.1.8'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.apache.activemq:activemq-broker:5.19.1'
+    testImplementation 'org.apache.activemq:activemq-broker:6.1.8'
     testImplementation 'junit:junit'
 }
 
